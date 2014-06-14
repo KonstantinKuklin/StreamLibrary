@@ -13,8 +13,11 @@ use Stream\Exceptions\StreamException;
 class Stream
 {
     private $stream = null;
-    private $urlConnection = null;
     private $driver = null;
+
+    private $path = null;
+    private $protocol = null;
+    private $port = 0;
 
     const PROTOCOL_TCP = 'tcp';
     const PROTOCOL_UDP = 'udp';
@@ -45,17 +48,20 @@ class Stream
             $this->validatePort($port);
         }
 
-        $urlConnection = $protocol . '://' . $path;
-        if (!is_null($port)) {
-            $urlConnection .= ':' . $port;
+        if ($driver !== null) {
+            $this->driver = $driver;
         }
+    }
 
-        $socket = stream_socket_client($urlConnection, $errorNumber, $errorMessage);
-        if (!$socket) {
+
+    public function open()
+    {
+        $stream = stream_socket_client($this->getUrlConnection(), $errorNumber, $errorMessage);
+        if (!$stream) {
             throw new ConnectionStreamException(
                 sprintf(
-                    "Can't connect to '%s'. Error number: '%d', error message: '%s'",
-                    $urlConnection,
+                    "Can't open '%s'. Error number: '%d', error message: '%s'",
+                    $this->getUrlConnection(),
                     $errorNumber,
                     $errorMessage
                 )
@@ -63,12 +69,14 @@ class Stream
             );
         }
 
-        $this->stream = $socket;
-        $this->urlConnection = $urlConnection;
+        $this->stream = $stream;
 
-        if ($driver !== null) {
-            $this->driver = $driver;
-        }
+        return true;
+    }
+
+    public function isOpened()
+    {
+        return !is_null($this->getStream());
     }
 
     /**
@@ -85,15 +93,19 @@ class Stream
      */
     public function getContents($maxLength = -1, $offset = -1)
     {
+        if (!$this->isOpened()) {
+            $this->open();
+        }
+
         $receiveMessage = stream_get_contents($this->getStream(), $maxLength, $offset);
         if (!$receiveMessage) {
             throw new StreamException(
-                sprintf("Can't read contents from '%s'", $this->urlConnection)
+                sprintf("Can't read contents from '%s'", $this->getUrlConnection())
             );
         }
 
         if ($this->hasDriver()) {
-            $this->getDriver()->prepareReceiveData($receiveMessage);
+            $receiveMessage = $this->getDriver()->prepareReceiveData($receiveMessage);
         }
 
         return $receiveMessage;
@@ -112,18 +124,35 @@ class Stream
      */
     public function sendContents($contents)
     {
+        if (!$this->isOpened()) {
+            $this->open();
+        }
+
         if ($this->hasDriver()) {
-            $this->getDriver()->prepareReceiveData($contents);
+            $contents = $this->getDriver()->prepareReceiveData($contents);
         }
 
         $bytesSent = stream_socket_sendto($this->getStream(), $contents);
         if (!$bytesSent) {
             throw new StreamException(
-                sprintf("Can't sent contents to '%s'", $this->urlConnection)
+                sprintf("Can't sent contents to '%s'", $this->getUrlConnection())
             );
         }
 
         return $bytesSent;
+    }
+
+    public function close()
+    {
+        if ($this->getStream() !== null) {
+            if (!stream_socket_shutdown($this->stream, STREAM_SHUT_RDWR)) {
+                throw new StreamException(
+                    sprintf("Can't close connection to '%s'", $this->getUrlConnection())
+                );
+            }
+        }
+
+        $this->stream = null;
     }
 
     /**
@@ -134,13 +163,32 @@ class Stream
      */
     public function __destruct()
     {
-        if ($this->getStream() !== null) {
-            if (!stream_socket_shutdown($this->stream, STREAM_SHUT_RDWR)) {
-                throw new StreamException(
-                    sprintf("Can't close connection to '%s'", $this->urlConnection)
-                );
-            }
+        $this->close();
+    }
+
+    private function getUrlConnection()
+    {
+        $urlConnection = $this->getProtocol() . '://' . $this->getPath();
+        if ($this->getPort() > 0) {
+            $urlConnection .= ':' . $this->getPort();
         }
+
+        return $urlConnection;
+    }
+
+    private function getProtocol()
+    {
+        return $this->protocol;
+    }
+
+    private function getPort()
+    {
+        return $this->port;
+    }
+
+    private function getPath()
+    {
+        return $this->path;
     }
 
     /**

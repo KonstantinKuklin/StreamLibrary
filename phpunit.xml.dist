@@ -3,7 +3,7 @@
 <phpunit colors="true" bootstrap="./vendor/autoload.php">
     <testsuites>
         <testsuite name="StreamLibrary Test Suite">
-            <directory>./src/Stream/Tests/</directory>
+            <directory>./tests/</directory>
         </testsuite>
     </testsuites>
 
