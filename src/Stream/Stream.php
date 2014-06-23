@@ -23,15 +23,18 @@ class Stream
     const PROTOCOL_UDP = 'udp';
     const PROTOCOL_UNIX = 'unix';
 
+    const STR_EMPTY = '';
+
     /**
-     * @param  string $path
+     * @param  string                $path
      *         Path to file on system or ip address in network or hostname
-     * @param  string $protocol
+     * @param  string                $protocol
      *         String value of protocol type
-     * @param  int $port
+     * @param  int                   $port
      *         Integer value of port
      * @param  StreamDriverInterface $driver
      *         Driver object that will make changes on send and receive data via stream
+     *
      * @throws ConnectionStreamException
      *         Throw if connection failed
      * @throws PortValidateStreamException
@@ -51,6 +54,9 @@ class Stream
         if ($driver !== null) {
             $this->driver = $driver;
         }
+        $this->path = $path;
+        $this->port = $port;
+        $this->protocol = $protocol;
     }
 
 
@@ -82,22 +88,23 @@ class Stream
     /**
      * Receive data from active stream
      *
-     * @param  int $maxLength
-     *         The maximum bytes to read. Defaults to -1 (read all the remaining buffer)
-     * @param  int $offset
+     * @param  int    $maxLength
+     *         The maximum bytes to read. Defaults to 1000000
+     * @param  string $delimiter
      *         Seek to the specified offset before reading. Defaults -1 (read without offset)
+     *
      * @return string
      *         Data from stream after Driver preparation.
      * @throws StreamException
      *         Throw exception if no data has been got from stream
      */
-    public function getContents($maxLength = -1, $offset = -1)
+    public function getContents($maxLength = 1024, $delimiter = null)
     {
         if (!$this->isOpened()) {
             $this->open();
         }
+        $receiveMessage = stream_get_line($this->getStream(), $maxLength, $delimiter);
 
-        $receiveMessage = stream_get_contents($this->getStream(), $maxLength, $offset);
         if (!$receiveMessage) {
             throw new StreamException(
                 sprintf("Can't read contents from '%s'", $this->getUrlConnection())
@@ -116,6 +123,7 @@ class Stream
      *
      * @param  string $contents
      *         Data for sending
+     *
      * @return int
      *         Count of bytes sent successfully
      * @throws StreamException
@@ -232,6 +240,7 @@ class Stream
 
     /**
      * @param $path
+     *
      * @return bool
      */
     private function validatePath($path)
@@ -245,6 +254,7 @@ class Stream
      *
      * @param  int|null $port
      *         Integer value of port
+     *
      * @throws PortValidateStreamException
      * @return bool
      *         Return true if all ok
@@ -265,6 +275,7 @@ class Stream
      *
      * @param  string $protocol
      *         String value of protocol type
+     *
      * @return bool
      *         Return true if all ok
      * @throws ProtocolValidateStreamException

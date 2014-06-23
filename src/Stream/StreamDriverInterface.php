@@ -8,14 +8,14 @@ namespace Stream;
 interface StreamDriverInterface
 {
     /**
-     * @param  string $data
+     * @param  array $data
      * @return string
      */
     public function prepareSendData($data);
 
     /**
      * @param  string $data
-     * @return string
+     * @return array
      */
     public function prepareReceiveData($data);
 
