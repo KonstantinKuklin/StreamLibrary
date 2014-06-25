@@ -137,7 +137,7 @@ class Stream
         }
 
         if ($this->hasDriver()) {
-            $contents = $this->getDriver()->prepareReceiveData($contents);
+            $contents = $this->getDriver()->prepareSendData($contents);
         }
 
         $bytesSent = stream_socket_sendto($this->getStream(), $contents);
