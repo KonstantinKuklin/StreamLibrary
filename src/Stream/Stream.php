@@ -3,6 +3,7 @@
 namespace Stream;
 
 use Stream\Exceptions\ConnectionStreamException;
+use Stream\Exceptions\NotStringStreamException;
 use Stream\Exceptions\PortValidateStreamException;
 use Stream\Exceptions\ProtocolValidateStreamException;
 use Stream\Exceptions\StreamException;
@@ -60,6 +61,10 @@ class Stream
     }
 
 
+    /**
+     * @return bool
+     * @throws Exceptions\ConnectionStreamException
+     */
     public function open()
     {
         $stream = stream_socket_client($this->getUrlConnection(), $errorNumber, $errorMessage);
@@ -80,6 +85,9 @@ class Stream
         return true;
     }
 
+    /**
+     * @return bool
+     */
     public function isOpened()
     {
         return !is_null($this->getStream());
@@ -138,6 +146,12 @@ class Stream
 
         if ($this->hasDriver()) {
             $contents = $this->getDriver()->prepareSendData($contents);
+
+            if (!is_string($contents)) {
+                throw new NotStringStreamException(
+                    sprintf("Can't sent not a string data. Data: %s"), print_r($contents)
+                );
+            }
         }
 
         $bytesSent = stream_socket_sendto($this->getStream(), $contents);
