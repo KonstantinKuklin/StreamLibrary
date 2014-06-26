@@ -106,7 +106,7 @@ class Stream
      * @throws StreamException
      *         Throw exception if no data has been got from stream
      */
-    public function getContents($maxLength = 1024, $delimiter = null)
+    public function getContents($maxLength = 1024, $delimiter = "\n")
     {
         if (!$this->isOpened()) {
             $this->open();
@@ -146,12 +146,12 @@ class Stream
 
         if ($this->hasDriver()) {
             $contents = $this->getDriver()->prepareSendData($contents);
+        }
 
-            if (!is_string($contents)) {
-                throw new NotStringStreamException(
-                    sprintf("Can't sent not a string data. Data: %s"), print_r($contents)
-                );
-            }
+        if (!is_string($contents)) {
+            throw new NotStringStreamException(
+                sprintf("Can't sent not a string data.Data sent: %s", print_r($contents, true))
+            );
         }
 
         $bytesSent = stream_socket_sendto($this->getStream(), $contents);
@@ -164,6 +164,9 @@ class Stream
         return $bytesSent;
     }
 
+    /**
+     * @throws Exceptions\StreamException
+     */
     public function close()
     {
         if ($this->getStream() !== null) {
@@ -175,6 +178,17 @@ class Stream
         }
 
         $this->stream = null;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isFeof()
+    {
+        if($this->getStream() === null){
+            return true;
+        }
+        return feof($this->getStream());
     }
 
     /**
