@@ -36,8 +36,6 @@ class Stream
      * @param  StreamDriverInterface $driver
      *         Driver object that will make changes on send and receive data via stream
      *
-     * @throws ConnectionStreamException
-     *         Throw if connection failed
      * @throws PortValidateStreamException
      *         Throw if port is not valid
      * @throws ProtocolValidateStreamException
@@ -45,7 +43,7 @@ class Stream
      */
     public function __construct($path, $protocol, $port = 0, StreamDriverInterface $driver = null)
     {
-        $this->validatePath($path);
+        // $this->validatePath($path);
         $this->validateProtocol($protocol);
         // it is doesn't matter what is the port if protocol is UNIX
         if ($protocol !== self::PROTOCOL_UNIX) {
@@ -111,6 +109,8 @@ class Stream
         if (!$this->isOpened()) {
             $this->open();
         }
+
+        $this->isStreamNotNull();
         $receiveMessage = stream_get_line($this->getStream(), $maxLength, $delimiter);
 
         if (!$receiveMessage) {
@@ -154,6 +154,7 @@ class Stream
             );
         }
 
+        $this->isStreamNotNull();
         $bytesSent = stream_socket_sendto($this->getStream(), $contents);
         if (!$bytesSent) {
             throw new StreamException(
@@ -185,10 +186,11 @@ class Stream
      */
     public function isFeof()
     {
-        if($this->getStream() === null){
+        if ($this->getStream() === null) {
             return true;
+        } else {
+            return feof($this->getStream());
         }
-        return feof($this->getStream());
     }
 
     /**
@@ -259,23 +261,23 @@ class Stream
      * Method return Driver for worked with stream.
      * This driver will make changes with receive and send data.
      *
-     * @return null|StreamDriverInterface
+     * @return StreamDriverInterface
      */
     private function getDriver()
     {
         return $this->driver;
     }
 
-    /**
-     * @param $path
-     *
-     * @return bool
-     */
-    private function validatePath($path)
-    {
-        // TODO. Not yet work
-        return true;
-    }
+//    /**
+//     * @param string $path
+//     *
+//     * @return bool
+//     */
+//    private function validatePath($path)
+//    {
+//        // TODO. Not yet work
+//        return true;
+//    }
 
     /**
      * Check that port is integer and the value is inside 0-65535
@@ -323,5 +325,19 @@ class Stream
             );
         }
 
+    }
+
+    /**
+     * Check stream is up
+     *
+     * @throws Exceptions\StreamException
+     */
+    private function isStreamNotNull()
+    {
+        if ($this->getStream() === null) {
+            throw new StreamException(
+                sprintf("Something goes wrong, stream is null. Connection url is:'%s'", $this->getUrlConnection())
+            );
+        }
     }
 }

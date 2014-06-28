@@ -20,5 +20,4 @@ interface StreamDriverInterface
      * @return mixed
      */
     public function prepareReceiveData($data);
-
 }
