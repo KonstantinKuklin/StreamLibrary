@@ -92,38 +92,27 @@ class Stream
     }
 
     /**
-     * Receive data from active stream
-     *
-     * @param  int    $maxLength
-     *         The maximum bytes to read. Defaults to 1000000
-     * @param  string $delimiter
-     *         Seek to the specified offset before reading. Defaults -1 (read without offset)
+     * @param int $maxLength
+     * @param int $offset
      *
      * @return string
-     *         Data from stream after Driver preparation.
      * @throws StreamException
-     *         Throw exception if no data has been got from stream
      */
-    public function getContents($maxLength = 1024, $delimiter = "\n")
+    public function getContents($maxLength = 1024, $offset = -1)
     {
-        if (!$this->isOpened()) {
-            $this->open();
-        }
+        return $this->getContentsByCase($maxLength, null, $offset);
+    }
 
-        $this->isStreamNotNull();
-        $receiveMessage = stream_get_line($this->getStream(), $maxLength, $delimiter);
-
-        if (!$receiveMessage) {
-            throw new StreamException(
-                sprintf("Can't read contents from '%s'", $this->getUrlConnection())
-            );
-        }
-
-        if ($this->hasDriver()) {
-            $receiveMessage = $this->getDriver()->prepareReceiveData($receiveMessage);
-        }
-
-        return $receiveMessage;
+    /**
+     * @param int    $maxLength
+     * @param string $delimiter
+     *
+     * @return string
+     * @throws StreamException
+     */
+    public function getContentsByLine($maxLength = 1024, $delimiter = "\n")
+    {
+        return $this->getContentsByCase($maxLength, $delimiter, null);
     }
 
     /**
@@ -184,7 +173,7 @@ class Stream
     /**
      * @return bool
      */
-    public function isFeof()
+    public function isEof()
     {
         if ($this->getStream() === null) {
             return true;
@@ -204,6 +193,51 @@ class Stream
         $this->close();
     }
 
+    /**
+     * Receive data from active stream
+     *
+     * @param  int     $maxLength
+     *         The maximum bytes to read. Defaults to 1024
+     * @param  string  $delimiter
+     *         Read content before this char
+     * @param null|int $offset
+     *         Seek to the specified offset before reading. Defaults -1 (read without offset)
+     *
+     * @throws Exceptions\ConnectionStreamException
+     * @throws Exceptions\StreamException
+     * @return string
+     *         Data from stream after Driver preparation.
+     */
+    private function getContentsByCase($maxLength, $delimiter = null, $offset = null)
+    {
+        if (!$this->isOpened()) {
+            $this->open();
+        }
+
+        $this->isStreamNotNull();
+        // if delimiter is null get all contents from stream
+        if (is_null($delimiter)) {
+            $receiveMessage = stream_get_contents($this->getStream(), $maxLength, $offset);
+        } else {
+            $receiveMessage = stream_get_line($this->getStream(), $maxLength, $delimiter);
+        }
+
+        if (!$receiveMessage) {
+            throw new StreamException(
+                sprintf("Can't read contents from '%s'", $this->getUrlConnection())
+            );
+        }
+
+        if ($this->hasDriver()) {
+            $receiveMessage = $this->getDriver()->prepareReceiveData($receiveMessage);
+        }
+
+        return $receiveMessage;
+    }
+
+    /**
+     * @return string
+     */
     private function getUrlConnection()
     {
         $urlConnection = $this->getProtocol() . '://' . $this->getPath();
@@ -214,16 +248,25 @@ class Stream
         return $urlConnection;
     }
 
+    /**
+     * @return null|string
+     */
     private function getProtocol()
     {
         return $this->protocol;
     }
 
+    /**
+     * @return int
+     */
     private function getPort()
     {
         return $this->port;
     }
 
+    /**
+     * @return null|string
+     */
     private function getPath()
     {
         return $this->path;

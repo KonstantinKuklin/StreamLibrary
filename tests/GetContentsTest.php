@@ -20,6 +20,8 @@ class TestDriver implements StreamDriverInterface
         if (is_array($data)) {
             return implode('', $data);
         }
+
+        return '';
     }
 
     /**
@@ -46,6 +48,13 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
             return;
         }
 
+        try {
+            unset($stream);
+        } catch (\Exception $e) {
+            // problem with good connection closing google.
+            // some times google close it, some times not, but it is don't care in this test
+        }
+
         $this->fail("sendContents with array in parameter didn't return NotStringStreamException exception.");
     }
 
@@ -60,12 +69,12 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
         }
 
         try {
-            $stream->close();
+            unset($stream);
         } catch (\Exception $e) {
             // problem with good connection closing google.
             // some times google close it, some times not, but it is don't care in this test
         }
-        
+
         $this->assertTrue(true);
     }
 
@@ -80,7 +89,7 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
         }
 
         try {
-            $stream->close();
+            unset($stream);
         } catch (\Exception $e) {
             // problem with good connection closing google.
             // some times google close it, some times not, but it is don't care in this test
