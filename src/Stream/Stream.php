@@ -20,6 +20,9 @@ class Stream
     private $protocol = null;
     private $port = 0;
 
+    private $readTimeOutSeconds = 0;
+    private $readTimeOutMicroSeconds = 0;
+
     const PROTOCOL_TCP = 'tcp';
     const PROTOCOL_UDP = 'udp';
     const PROTOCOL_UNIX = 'unix';
@@ -84,11 +87,168 @@ class Stream
     }
 
     /**
+     * @throws Exceptions\StreamException
      * @return bool
      */
-    public function isOpened()
+    public function isReadyForReading()
     {
-        return !is_null($this->getStream());
+        $read = array($this->getStream());
+        $write = null;
+        $except = null;
+
+        if (false === ($countChanged = stream_select(
+                $read,
+                $write,
+                $except,
+                $this->readTimeOutSeconds,
+                $this->readTimeOutMicroSeconds
+            ))
+        ) {
+            // error
+            throw new StreamException(
+                sprintf(
+                    'Error stream_select with time delay %d seconds and %d microseconds.',
+                    $this->readTimeOutSeconds,
+                    $this->readTimeOutMicroSeconds
+                )
+            );
+        } else {
+            if ($countChanged > 0) {
+                // stream was updated
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param bool $exceptionThrow
+     *
+     * @throws Exceptions\StreamException
+     * @return bool
+     */
+    public function isOpened($exceptionThrow = false)
+    {
+        $isStreamAlive = !is_null($this->getStream());
+        if ($exceptionThrow && !$isStreamAlive) {
+            throw new StreamException("Stream is not opened.");
+        }
+
+        return $isStreamAlive;
+    }
+
+    /**
+     * @param int $seconds
+     *
+     * @throws Exceptions\StreamException
+     */
+    public function setTimeOut($seconds)
+    {
+        if (!is_int($seconds) && $seconds < 0) {
+            throw new StreamException(
+                sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
+            );
+        }
+        $this->isOpened(true);
+        stream_set_timeout($this->getStream(), $seconds);
+    }
+
+    /**
+     * @param bool $blocking
+     *
+     * @throws Exceptions\StreamException
+     */
+    private function setBlocking($blocking)
+    {
+        if (!is_bool($blocking)) {
+            throw new StreamException(
+                sprintf("Must be boolean, got %s with value %s.", gettype($blocking), $blocking)
+            );
+        }
+        $this->isOpened(true);
+        stream_set_blocking($this->getStream(), $blocking);
+    }
+
+    /**
+     * @throws Exceptions\StreamException
+     */
+    public function setBlockingOn()
+    {
+        $this->setBlocking(true);
+    }
+
+    /**
+     * @throws Exceptions\StreamException
+     */
+    public function setBlockingOff()
+    {
+        $this->setBlocking(false);
+    }
+
+    /**
+     * @param int $seconds
+     * @param int $microSeconds
+     *
+     * @throws Exceptions\StreamException
+     */
+    public function setReadTimeOut($seconds, $microSeconds = 0)
+    {
+        if (!is_int($seconds) && $seconds < 0) {
+            throw new StreamException(
+                sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
+            );
+        }
+
+        if (!is_int($microSeconds) && $microSeconds < 0) {
+            throw new StreamException(
+                sprintf("Micro seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
+            );
+        }
+
+        $this->isOpened(true);
+
+        $this->readTimeOutSeconds = $seconds;
+        $this->readTimeOutMicroSeconds = $microSeconds;
+    }
+
+    /**
+     * @param int $maxLength
+     *
+     * @return string
+     * @throws Exceptions\StreamException
+     */
+    public function getContentsByFread($maxLength)
+    {
+        $this->validateInt($maxLength, "Mus be int > 0");
+        $this->prepareGetContents();
+
+        return $this->afterGetContents(@fread($this->getStream(), $maxLength));
+    }
+
+    /**
+     * @param null|int $length
+     *
+     * @return string
+     * @throws Exceptions\StreamException
+     */
+    public function getContentsByFgets($length = null)
+    {
+        $this->validateInt($length, "Mus be int > 0");
+        $this->prepareGetContents();
+
+        return $this->afterGetContents(@fgets($this->getStream(), $length));
+    }
+
+    /**
+     * @return string
+     * @throws Exceptions\StreamException
+     */
+    public function getContentsByFgetc()
+    {
+        $this->prepareGetContents();
+
+        return $this->afterGetContents(@fgetc($this->getStream()));
     }
 
     /**
@@ -96,23 +256,25 @@ class Stream
      * @param int $offset
      *
      * @return string
-     * @throws StreamException
      */
-    public function getContents($maxLength = 1024, $offset = -1)
+    public function getContentsBySteamGetContents($maxLength = 1024, $offset = -1)
     {
-        return $this->getContentsByCase($maxLength, null, $offset);
+        $this->prepareGetContents();
+
+        return $this->afterGetContents(@stream_get_contents($this->getStream(), $maxLength, $offset));
     }
 
     /**
-     * @param int    $maxLength
-     * @param string $delimiter
+     * @param int  $length
+     * @param null $ending
      *
      * @return string
-     * @throws StreamException
      */
-    public function getContentsByLine($maxLength = 1024, $delimiter = "\n")
+    public function getContentsBySteamGetLine($length, $ending = null)
     {
-        return $this->getContentsByCase($maxLength, $delimiter, null);
+        $this->prepareGetContents();
+
+        return $this->afterGetContents(@stream_get_line($this->getStream(), $length, $ending));
     }
 
     /**
@@ -143,7 +305,6 @@ class Stream
             );
         }
 
-        $this->isStreamNotNull();
         $bytesSent = stream_socket_sendto($this->getStream(), $contents);
         if (!$bytesSent) {
             throw new StreamException(
@@ -160,7 +321,7 @@ class Stream
     public function close()
     {
         if ($this->getStream() !== null) {
-            if (!stream_socket_shutdown($this->stream, STREAM_SHUT_RDWR)) {
+            if (!fclose($this->getStream())) {
                 throw new StreamException(
                     sprintf("Can't close connection to '%s'", $this->getUrlConnection())
                 );
@@ -191,48 +352,6 @@ class Stream
     public function __destruct()
     {
         $this->close();
-    }
-
-    /**
-     * Receive data from active stream
-     *
-     * @param  int     $maxLength
-     *         The maximum bytes to read. Defaults to 1024
-     * @param  string  $delimiter
-     *         Read content before this char
-     * @param null|int $offset
-     *         Seek to the specified offset before reading. Defaults -1 (read without offset)
-     *
-     * @throws Exceptions\ConnectionStreamException
-     * @throws Exceptions\StreamException
-     * @return string
-     *         Data from stream after Driver preparation.
-     */
-    private function getContentsByCase($maxLength, $delimiter = null, $offset = null)
-    {
-        if (!$this->isOpened()) {
-            $this->open();
-        }
-
-        $this->isStreamNotNull();
-        // if delimiter is null get all contents from stream
-        if (is_null($delimiter)) {
-            $receiveMessage = stream_get_contents($this->getStream(), $maxLength, $offset);
-        } else {
-            $receiveMessage = stream_get_line($this->getStream(), $maxLength, $delimiter);
-        }
-
-        if (!$receiveMessage) {
-            throw new StreamException(
-                sprintf("Can't read contents from '%s'", $this->getUrlConnection())
-            );
-        }
-
-        if ($this->hasDriver()) {
-            $receiveMessage = $this->getDriver()->prepareReceiveData($receiveMessage);
-        }
-
-        return $receiveMessage;
     }
 
     /**
@@ -371,16 +490,50 @@ class Stream
     }
 
     /**
-     * Check stream is up
+     * @param int         $int
+     * @param null|string $throwWithMessage
      *
+     * @return bool
      * @throws Exceptions\StreamException
      */
-    private function isStreamNotNull()
+    private function validateInt($int, $throwWithMessage = null)
     {
-        if ($this->getStream() === null) {
-            throw new StreamException(
-                sprintf("Something goes wrong, stream is null. Connection url is:'%s'", $this->getUrlConnection())
-            );
+        if (!is_int($int)) {
+            if (!is_null($throwWithMessage)) {
+                throw new StreamException(
+                    sprintf("%s.But got %s with value %s.", $throwWithMessage, gettype($int), $int)
+                );
+            }
+
+            return false;
         }
+
+        return true;
+    }
+
+    /**
+     * @throws Exceptions\ConnectionStreamException
+     * @throws Exceptions\StreamException
+     */
+    private function prepareGetContents()
+    {
+        if (!$this->isOpened()) {
+            $this->open();
+        }
+    }
+
+    /**
+     * @param string $receiveMessage
+     *
+     * @throws Exceptions\StreamException
+     * @return mixed
+     */
+    private function afterGetContents($receiveMessage)
+    {
+        if ($this->hasDriver()) {
+            $receiveMessage = $this->getDriver()->prepareReceiveData($receiveMessage);
+        }
+
+        return $receiveMessage;
     }
 }

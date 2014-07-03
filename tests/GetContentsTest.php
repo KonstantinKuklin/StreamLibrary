@@ -48,13 +48,6 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
             return;
         }
 
-        try {
-            unset($stream);
-        } catch (\Exception $e) {
-            // problem with good connection closing google.
-            // some times google close it, some times not, but it is don't care in this test
-        }
-
         $this->fail("sendContents with array in parameter didn't return NotStringStreamException exception.");
     }
 
@@ -68,13 +61,6 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
             $this->fail("sendContents with array in parameter didn't return NotStringStreamException exception.");
         }
 
-        try {
-            unset($stream);
-        } catch (\Exception $e) {
-            // problem with good connection closing google.
-            // some times google close it, some times not, but it is don't care in this test
-        }
-
         $this->assertTrue(true);
     }
 
@@ -83,16 +69,17 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
         $stream = new Stream('google.ru', Stream::PROTOCOL_TCP, 80);
 
         $stream->sendContents($this->query);
-        $contents = explode("\n", $stream->getContents());
-        if (!isset($contents[0])) {
-            $this->fail("Got wrong response.");
+        $stream->setReadTimeOut(2);
+        $stream->setBlockingOff();
+
+        $contents = '';
+        if ($stream->isReadyForReading()) {
+            $contents .= $stream->getContentsBySteamGetContents();
         }
 
-        try {
-            unset($stream);
-        } catch (\Exception $e) {
-            // problem with good connection closing google.
-            // some times google close it, some times not, but it is don't care in this test
+        $contents = explode("\n", $contents);
+        if (!isset($contents[0])) {
+            $this->fail("Got wrong response.");
         }
 
         $this->assertEquals("HTTP/1.0 302 Found", trim($contents[0]), "Contents was got incorrect.");
