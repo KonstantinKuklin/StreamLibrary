@@ -74,7 +74,7 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
 
         $contents = '';
         if ($stream->isReadyForReading()) {
-            $contents .= $stream->getContentsBySteamGetContents();
+            $contents .= $stream->getContentsByStreamGetContents();
         }
 
         $contents = explode("\n", $contents);

@@ -257,7 +257,7 @@ class Stream
      *
      * @return string
      */
-    public function getContentsBySteamGetContents($maxLength = 1024, $offset = -1)
+    public function getContentsByStreamGetContents($maxLength = 1024, $offset = -1)
     {
         $this->prepareGetContents();
 
@@ -270,7 +270,7 @@ class Stream
      *
      * @return string
      */
-    public function getContentsBySteamGetLine($length, $ending = null)
+    public function getContentsByStreamGetLine($length, $ending = null)
     {
         $this->prepareGetContents();
 
