@@ -278,6 +278,19 @@ class Stream
     }
 
     /**
+     * @return array|bool
+     * @throws Exceptions\StreamException
+     */
+    public function getMetaData()
+    {
+        if (!$this->isOpened()) {
+            return false;
+        }
+
+        return stream_get_meta_data($this->getStream());
+    }
+
+    /**
      * Send data throw active stream
      *
      * @param  string $contents
