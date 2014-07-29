@@ -1,6 +1,7 @@
 [![Build Status](https://travis-ci.org/KonstantinKuklin/StreamLibrary.svg?branch=master)](https://travis-ci.org/KonstantinKuklin/StreamLibrary)
 [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/KonstantinKuklin/StreamLibrary/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/KonstantinKuklin/StreamLibrary/?branch=master)
-
+[![Latest Stable Version](https://poser.pugx.org/konstantin-kuklin/stream-library/v/stable.png)](https://packagist.org/packages/konstantin-kuklin/stream-library)
+[![Total Downloads](https://poser.pugx.org/konstantin-kuklin/stream-library/downloads.png)](https://packagist.org/packages/konstantin-kuklin/stream-library)
 
 README
 ======
