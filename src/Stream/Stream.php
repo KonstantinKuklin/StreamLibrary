@@ -6,7 +6,11 @@ use Stream\Exceptions\ConnectionStreamException;
 use Stream\Exceptions\NotStringStreamException;
 use Stream\Exceptions\PortValidateStreamException;
 use Stream\Exceptions\ProtocolValidateStreamException;
+use Stream\Exceptions\ReadStreamException;
+use Stream\Exceptions\ReceiveMethodStreamException;
 use Stream\Exceptions\StreamException;
+use Respect\Validation\Validator as v;
+use Stream\ReceiveMethod\MethodInterface;
 
 /**
  * @author KonstantinKuklin <konstantin.kuklin@gmail.com>
@@ -23,6 +27,8 @@ class Stream
     private $readTimeOutSeconds = 0;
     private $readTimeOutMicroSeconds = 0;
 
+    private $method = null;
+
     const PROTOCOL_TCP = 'tcp';
     const PROTOCOL_UDP = 'udp';
     const PROTOCOL_UNIX = 'unix';
@@ -30,11 +36,11 @@ class Stream
     const STR_EMPTY = '';
 
     /**
-     * @param  string                $path
+     * @param  string $path
      *         Path to file on system or ip address in network or hostname
-     * @param  string                $protocol
+     * @param  string $protocol
      *         String value of protocol type
-     * @param  int                   $port
+     * @param  int $port
      *         Integer value of port
      * @param  StreamDriverInterface $driver
      *         Driver object that will make changes on send and receive data via stream
@@ -50,7 +56,11 @@ class Stream
         $this->validateProtocol($protocol);
         // it is doesn't matter what is the port if protocol is UNIX
         if ($protocol !== self::PROTOCOL_UNIX) {
-            $this->validatePort($port);
+            if (!v::int()->between(0, 65635)->validate($port)) {
+                throw new PortValidateStreamException(
+                    sprintf("Port '%s' is not a integer number or not inside the range: 0-65535", $port)
+                );
+            }
         }
 
         if ($driver !== null) {
@@ -68,7 +78,7 @@ class Stream
      */
     public function open()
     {
-        $stream = stream_socket_client($this->getUrlConnection(), $errorNumber, $errorMessage);
+        $stream = @stream_socket_client($this->getUrlConnection(), $errorNumber, $errorMessage);
         if (!$stream) {
             throw new ConnectionStreamException(
                 sprintf(
@@ -145,29 +155,13 @@ class Stream
      */
     public function setTimeOut($seconds)
     {
-        if (!is_int($seconds) && $seconds < 0) {
+        if (!v::int()->positive()->validate($seconds)) {
             throw new StreamException(
                 sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
             );
         }
         $this->isOpened(true);
-        stream_set_timeout($this->getStream(), $seconds);
-    }
-
-    /**
-     * @param bool $blocking
-     *
-     * @throws Exceptions\StreamException
-     */
-    private function setBlocking($blocking)
-    {
-        if (!is_bool($blocking)) {
-            throw new StreamException(
-                sprintf("Must be boolean, got %s with value %s.", gettype($blocking), $blocking)
-            );
-        }
-        $this->isOpened(true);
-        stream_set_blocking($this->getStream(), $blocking);
+        @stream_set_timeout($this->getStream(), $seconds);
     }
 
     /**
@@ -194,15 +188,15 @@ class Stream
      */
     public function setReadTimeOut($seconds, $microSeconds = 0)
     {
-        if (!is_int($seconds) && $seconds < 0) {
+        if (!v::int()->positive()->validate($seconds)) {
             throw new StreamException(
                 sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
             );
         }
 
-        if (!is_int($microSeconds) && $microSeconds < 0) {
+        if ($microSeconds !== 0 && !v::float()->positive()->validate($microSeconds)) {
             throw new StreamException(
-                sprintf("Micro seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
+                sprintf("Micro seconds must be float > 0, got %s with value %s.", gettype($seconds), $seconds)
             );
         }
 
@@ -213,68 +207,55 @@ class Stream
     }
 
     /**
-     * @param int $maxLength
-     *
-     * @return string
+     * @param MethodInterface $method
+     */
+    public function setReceiveMethod(MethodInterface $method)
+    {
+        $this->method = $method;
+    }
+
+    /**
+     * @return null|string
+     */
+    public function getReceiveMethodName()
+    {
+        if ($this->method === null) {
+            return null;
+        } else {
+            return get_class($this->method);
+        }
+    }
+
+    /**
+     * @throws Exceptions\ConnectionStreamException
+     * @throws Exceptions\ReadStreamException
+     * @throws Exceptions\ReceiveMethodStreamException
      * @throws Exceptions\StreamException
-     */
-    public function getContentsByFread($maxLength)
-    {
-        $this->validateInt($maxLength, "Mus be int > 0");
-        $this->prepareGetContents();
-
-        return $this->afterGetContents(@fread($this->getStream(), $maxLength));
-    }
-
-    /**
-     * @param null|int $length
-     *
-     * @return string
-     * @throws Exceptions\StreamException
-     */
-    public function getContentsByFgets($length = null)
-    {
-        $this->validateInt($length, "Mus be int > 0");
-        $this->prepareGetContents();
-
-        return $this->afterGetContents(@fgets($this->getStream(), $length));
-    }
-
-    /**
-     * @return string
-     * @throws Exceptions\StreamException
-     */
-    public function getContentsByFgetc()
-    {
-        $this->prepareGetContents();
-
-        return $this->afterGetContents(@fgetc($this->getStream()));
-    }
-
-    /**
-     * @param int $maxLength
-     * @param int $offset
-     *
      * @return string
      */
-    public function getContentsByStreamGetContents($maxLength = 1024, $offset = -1)
+    public function getContents()
     {
-        $this->prepareGetContents();
+        if ($this->method === null) {
+            throw new ReceiveMethodStreamException(
+                'ReceiveMethod was not set. Use $stream->setReceiveMethod to fix it.'
+            );
+        }
 
-        return $this->afterGetContents(@stream_get_contents($this->getStream(), $maxLength, $offset));
-    }
+        if (!$this->isOpened()) {
+            $this->open();
+        }
 
-    /**
-     * @param int  $length
-     * @param null $ending
-     *
-     * @return string
-     */
-    public function getContentsByStreamGetLine($length, $ending = null)
-    {
-        $this->prepareGetContents();
+        $receiveMessage = $this->getReceiveMethod()->readStream($this->getStream());
 
-        return $this->afterGetContents(@stream_get_line($this->getStream(), $length, $ending));
+        if (!$receiveMessage) {
+            throw new ReadStreamException("Nothing was readed from stream.");
+        }
+
+        if ($this->hasDriver()) {
+            return $this->getDriver()->prepareReceiveData($receiveMessage);
+        }
+
+        return $receiveMessage;
     }
 
     /**
@@ -287,7 +268,7 @@ class Stream
             return false;
         }
 
-        return stream_get_meta_data($this->getStream());
+        return @stream_get_meta_data($this->getStream());
     }
 
     /**
@@ -352,7 +333,7 @@ class Stream
         if ($this->getStream() === null) {
             return true;
         } else {
-            return feof($this->getStream());
+            return @feof($this->getStream());
         }
     }
 
@@ -455,27 +436,6 @@ class Stream
 //    }
 
     /**
-     * Check that port is integer and the value is inside 0-65535
-     *
-     * @param  int|null $port
-     *         Integer value of port
-     *
-     * @throws PortValidateStreamException
-     * @return bool
-     *         Return true if all ok
-     */
-    private function validatePort($port)
-    {
-        if (is_int($port) && $port > 0 && $port < 65535) {
-            return true;
-        }
-
-        throw new PortValidateStreamException(
-            sprintf("Port '%s' is not a integer number or not inside the range: 0-65535", $port)
-        );
-    }
-
-    /**
      * Try to understand what 1 of the 3 known protocol we shall use
      *
      * @param  string $protocol
@@ -503,50 +463,26 @@ class Stream
     }
 
     /**
-     * @param int         $int
-     * @param null|string $throwWithMessage
+     * @param bool $blocking
      *
-     * @return bool
      * @throws Exceptions\StreamException
      */
-    private function validateInt($int, $throwWithMessage = null)
+    private function setBlocking($blocking)
     {
-        if (!is_int($int)) {
-            if (!is_null($throwWithMessage)) {
-                throw new StreamException(
-                    sprintf("%s.But got %s with value %s.", $throwWithMessage, gettype($int), $int)
-                );
-            }
-
-            return false;
+        if (!is_bool($blocking)) {
+            throw new StreamException(
+                sprintf("Must be boolean, got %s with value %s.", gettype($blocking), $blocking)
+            );
         }
-
-        return true;
+        $this->isOpened(true);
+        @stream_set_blocking($this->getStream(), $blocking);
     }
 
     /**
-     * @throws Exceptions\ConnectionStreamException
-     * @throws Exceptions\StreamException
+     * @return MethodInterface
      */
-    private function prepareGetContents()
+    private function getReceiveMethod()
     {
-        if (!$this->isOpened()) {
-            $this->open();
-        }
-    }
-
-    /**
-     * @param string $receiveMessage
-     *
-     * @throws Exceptions\StreamException
-     * @return mixed
-     */
-    private function afterGetContents($receiveMessage)
-    {
-        if ($this->hasDriver()) {
-            $receiveMessage = $this->getDriver()->prepareReceiveData($receiveMessage);
-        }
-
-        return $receiveMessage;
+        return $this->method;
     }
 }

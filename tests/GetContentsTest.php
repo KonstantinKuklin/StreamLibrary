@@ -6,6 +6,7 @@
 namespace Stream\Tests;
 
 
+use Stream\ReceiveMethod\StreamGetContentsMethod;
 use Stream\Stream;
 use Stream\Exceptions\NotStringStreamException;
 use Stream\StreamDriverInterface;
@@ -71,10 +72,11 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
         $stream->sendContents($this->query);
         $stream->setReadTimeOut(2);
         $stream->setBlockingOff();
+        $stream->setReceiveMethod(new StreamGetContentsMethod());
 
         $contents = '';
         if ($stream->isReadyForReading()) {
-            $contents .= $stream->getContentsByStreamGetContents();
+            $contents .= $stream->getContents();
         }
 
         $contents = explode("\n", $contents);

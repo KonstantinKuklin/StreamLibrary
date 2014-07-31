@@ -48,7 +48,8 @@ $stream = new \Stream\Stream($path, $protocol, $port, $driver);
 
 ```php
 $stream = new \Stream\Stream($path, $protocol, $port, $driver);
-$stream->getContents($maxLength, $offset);
+$stream->setReceiveMethod(new StreamGetContentsMethod($maxLength, $offset));
+$stream->getContents();
 ```
 
 **maxLength** - The maximum bytes to read. Default value is -1 (read all the remaining buffer)
