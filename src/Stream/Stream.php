@@ -155,7 +155,7 @@ class Stream
      */
     public function setTimeOut($seconds)
     {
-        if (!v::int()->positive()->validate($seconds)) {
+        if (!v::int()->min(0, true)->validate($seconds)) {
             throw new StreamException(
                 sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
             );
@@ -188,15 +188,15 @@ class Stream
      */
     public function setReadTimeOut($seconds, $microSeconds = 0)
     {
-        if (!v::int()->positive()->validate($seconds)) {
+        if (!v::int()->min(0, true)->validate($seconds)) {
             throw new StreamException(
                 sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
             );
         }
 
-        if ($microSeconds !== 0 && !v::float()->positive()->validate($microSeconds)) {
+        if ($microSeconds !== 0 && !v::int()->min(0, true)->validate($microSeconds)) {
             throw new StreamException(
-                sprintf("Micro seconds must be float > 0, got %s with value %s.", gettype($seconds), $seconds)
+                sprintf("Micro seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
             );
         }
 
