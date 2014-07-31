@@ -351,7 +351,7 @@ class Stream
     /**
      * @return string
      */
-    private function getUrlConnection()
+    public function getUrlConnection()
     {
         $urlConnection = $this->getProtocol() . '://' . $this->getPath();
         if ($this->getPort() > 0) {
