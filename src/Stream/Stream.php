@@ -36,11 +36,11 @@ class Stream
     const STR_EMPTY = '';
 
     /**
-     * @param  string $path
+     * @param  string                $path
      *         Path to file on system or ip address in network or hostname
-     * @param  string $protocol
+     * @param  string                $protocol
      *         String value of protocol type
-     * @param  int $port
+     * @param  int                   $port
      *         Integer value of port
      * @param  StreamDriverInterface $driver
      *         Driver object that will make changes on send and receive data via stream
@@ -103,8 +103,8 @@ class Stream
     public function isReadyForReading()
     {
         $read = array($this->getStream());
-        $write = null;
-        $except = null;
+        $write = array();
+        $except = array();
 
         if (false === ($countChanged = stream_select(
                 $read,
@@ -219,10 +219,10 @@ class Stream
      */
     public function getReceiveMethodName()
     {
-        if ($this->method === null) {
+        if ($this->getReceiveMethod() === null) {
             return null;
         } else {
-            return get_class($this->method);
+            return get_class($this->getReceiveMethod());
         }
     }
 
@@ -235,7 +235,7 @@ class Stream
      */
     public function getContents()
     {
-        if ($this->method === null) {
+        if ($this->getReceiveMethod() === null) {
             throw new ReceiveMethodStreamException(
                 'ReceiveMethod was not set. Use $stream->setReceiveMethod to fix it.'
             );
@@ -314,8 +314,9 @@ class Stream
      */
     public function close()
     {
-        if ($this->getStream() !== null) {
-            if (!fclose($this->getStream())) {
+        $stream = $this->getStream();
+        if ($stream !== null) {
+            if (!fclose($stream)) {
                 throw new StreamException(
                     sprintf("Can't close connection to '%s'", $this->getUrlConnection())
                 );
