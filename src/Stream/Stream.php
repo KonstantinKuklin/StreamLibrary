@@ -245,6 +245,10 @@ class Stream
             $this->open();
         }
 
+        if(!is_resource($this->getStream())){
+            throw new ConnectionStreamException("Stream is not a valid resource.");
+        }
+
         $receiveMessage = $this->getReceiveMethod()->readStream($this->getStream());
 
         if (!$receiveMessage) {
@@ -297,6 +301,10 @@ class Stream
             throw new NotStringStreamException(
                 sprintf("Can't sent not a string data.Data sent: %s", print_r($contents, true))
             );
+        }
+
+        if(!is_resource($this->getStream())){
+            throw new ConnectionStreamException("Stream is not a valid resource.");
         }
 
         $bytesSent = stream_socket_sendto($this->getStream(), $contents);
