@@ -2,14 +2,13 @@
 
 namespace Stream;
 
-use Stream\Exceptions\ConnectionStreamException;
-use Stream\Exceptions\NotStringStreamException;
-use Stream\Exceptions\PortValidateStreamException;
-use Stream\Exceptions\ProtocolValidateStreamException;
-use Stream\Exceptions\ReadStreamException;
-use Stream\Exceptions\ReceiveMethodStreamException;
-use Stream\Exceptions\StreamException;
 use Respect\Validation\Validator as v;
+use Stream\Exception\ConnectionStreamException;
+use Stream\Exception\PortValidateStreamException;
+use Stream\Exception\ProtocolValidateStreamException;
+use Stream\Exception\ReadStreamException;
+use Stream\Exception\ReceiveMethodStreamException;
+use Stream\Exception\StreamException;
 use Stream\ReceiveMethod\MethodInterface;
 
 /**
@@ -18,20 +17,14 @@ use Stream\ReceiveMethod\MethodInterface;
 class Stream
 {
     private $stream = null;
-    private $driver = null;
-
-    private $path = null;
-    private $protocol = null;
-    private $port = 0;
+    private $connection = null;
+    private $dataHandler = null;
 
     private $readTimeOutSeconds = 0;
     private $readTimeOutMicroSeconds = 0;
 
     private $method = null;
 
-    const PROTOCOL_TCP = 'tcp';
-    const PROTOCOL_UDP = 'udp';
-    const PROTOCOL_UNIX = 'unix';
 
     const STR_EMPTY = '';
 
@@ -52,39 +45,29 @@ class Stream
      */
     public function __construct($path, $protocol, $port = 0, StreamDriverInterface $driver = null)
     {
-        // $this->validatePath($path);
-        $this->validateProtocol($protocol);
-        // it is doesn't matter what is the port if protocol is UNIX
-        if ($protocol !== self::PROTOCOL_UNIX) {
-            if (!v::int()->between(0, 65635)->validate($port)) {
-                throw new PortValidateStreamException(
-                    sprintf("Port '%s' is not a integer number or not inside the range: 0-65535", $port)
-                );
-            }
-        }
-
         if ($driver !== null) {
             $this->driver = $driver;
         }
-        $this->path = $path;
-        $this->port = $port;
-        $this->protocol = $protocol;
+
+        $this->connection = new Connection($path, $protocol, $port);
+        $this->dataHandler = new DataHandler($driver);
     }
 
 
     /**
-     * @return bool
-     * @throws Exceptions\ConnectionStreamException
+     * @throws ConnectionStreamException
+     * @throws StreamException
+     * @return boolean
      */
     public function open()
     {
         if (!$this->isOpened()) {
-            $stream = @stream_socket_client($this->getUrlConnection(), $errorNumber, $errorMessage);
+            $stream = @stream_socket_client($this->getConnection()->getUrlConnection(), $errorNumber, $errorMessage);
             if (!$stream) {
                 throw new ConnectionStreamException(
                     sprintf(
                         "Can't open '%s'. Error number: '%d', error message: '%s'",
-                        $this->getUrlConnection(),
+                        $this->getConnection()->getUrlConnection(),
                         $errorNumber,
                         $errorMessage
                     )
@@ -99,7 +82,7 @@ class Stream
     }
 
     /**
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      * @return bool
      */
     public function isReadyForReading()
@@ -137,7 +120,7 @@ class Stream
     /**
      * @param bool $exceptionThrow
      *
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      * @return bool
      */
     public function isOpened($exceptionThrow = false)
@@ -153,21 +136,17 @@ class Stream
     /**
      * @param int $seconds
      *
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      */
     public function setTimeOut($seconds)
     {
-        if (!v::int()->min(0, true)->validate($seconds)) {
-            throw new StreamException(
-                sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
-            );
-        }
+        Validator::validateSeconds($seconds);
         $this->isOpened(true);
         @stream_set_timeout($this->getStream(), $seconds);
     }
 
     /**
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      */
     public function setBlockingOn()
     {
@@ -175,7 +154,7 @@ class Stream
     }
 
     /**
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      */
     public function setBlockingOff()
     {
@@ -186,21 +165,12 @@ class Stream
      * @param int $seconds
      * @param int $microSeconds
      *
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      */
     public function setReadTimeOut($seconds, $microSeconds = 0)
     {
-        if (!v::int()->min(0, true)->validate($seconds)) {
-            throw new StreamException(
-                sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
-            );
-        }
-
-        if ($microSeconds !== 0 && !v::int()->min(0, true)->validate($microSeconds)) {
-            throw new StreamException(
-                sprintf("Micro seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
-            );
-        }
+        Validator::validateSeconds($seconds);
+        Validator::validateMicroSeconds($microSeconds);
 
         $this->isOpened(true);
 
@@ -240,20 +210,11 @@ class Stream
         }
     }
 
-    private function prepareReceiveData($data)
-    {
-        if ($this->hasDriver()) {
-            return $this->getDriver()->prepareReceiveData($data);
-        }
-
-        return $data;
-    }
-
     /**
-     * @throws Exceptions\ConnectionStreamException
-     * @throws Exceptions\ReadStreamException
-     * @throws Exceptions\ReceiveMethodStreamException
-     * @throws Exceptions\StreamException
+     * @throws Exception\ConnectionStreamException
+     * @throws Exception\ReadStreamException
+     * @throws Exception\ReceiveMethodStreamException
+     * @throws Exception\StreamException
      * @return string
      */
     public function getContents()
@@ -267,12 +228,12 @@ class Stream
             throw new ReadStreamException("Nothing was readed from stream.");
         }
 
-        return $this->prepareReceiveData($receiveMessage);
+        return $this->getDataHandler()->prepareReceiveData($receiveMessage);
     }
 
     /**
      * @return array|bool
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      */
     public function getMetaData()
     {
@@ -298,12 +259,13 @@ class Stream
     public function sendContents($contents)
     {
         $this->open();
-        $contents = $this->prepareSendData($contents);
+        $contents = $this->getDataHandler()->prepareSendData($contents);
 
         $bytesSent = stream_socket_sendto($this->getExistedStream(), $contents);
+
         if (!$bytesSent) {
             throw new StreamException(
-                sprintf("Can't sent contents to '%s'", $this->getUrlConnection())
+                sprintf("Can't sent contents to '%s'", $this->getConnection()->getUrlConnection())
             );
         }
 
@@ -311,26 +273,7 @@ class Stream
     }
 
     /**
-     * @param mixed $data
-     *
-     * @throws NotStringStreamException
-     * @return string
-     */
-    private function prepareSendData($data)
-    {
-        if ($this->hasDriver()) {
-            $data = $this->getDriver()->prepareSendData($data);
-        }
-
-        if(!is_string($data)) {
-            throw new NotStringStreamException("After prepareSendData data must be string.");
-        }
-
-        return $data;
-    }
-
-    /**
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      */
     public function close()
     {
@@ -338,7 +281,7 @@ class Stream
         if ($stream !== null) {
             if (!fclose($stream)) {
                 throw new StreamException(
-                    sprintf("Can't close connection to '%s'", $this->getUrlConnection())
+                    sprintf("Can't close connection to '%s'", $this->getConnection()->getUrlConnection())
                 );
             }
         }
@@ -370,43 +313,6 @@ class Stream
     }
 
     /**
-     * @return string
-     */
-    public function getUrlConnection()
-    {
-        $urlConnection = $this->getProtocol() . '://' . $this->getPath();
-        if ($this->getPort() > 0) {
-            $urlConnection .= ':' . $this->getPort();
-        }
-
-        return $urlConnection;
-    }
-
-    /**
-     * @return null|string
-     */
-    private function getProtocol()
-    {
-        return $this->protocol;
-    }
-
-    /**
-     * @return int
-     */
-    private function getPort()
-    {
-        return $this->port;
-    }
-
-    /**
-     * @return null|string
-     */
-    private function getPath()
-    {
-        return $this->path;
-    }
-
-    /**
      * Get the resource link or null if we don't have active stream
      *
      * @return null|resource
@@ -432,74 +338,9 @@ class Stream
     }
 
     /**
-     * Returns the value of the driver is installed
-     *
-     * @return bool
-     *         true - we have a driver
-     *         false - we don't have a driver
-     */
-    private function hasDriver()
-    {
-        if ($this->getDriver() !== null) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Method return Driver for worked with stream.
-     * This driver will make changes with receive and send data.
-     *
-     * @return StreamDriverInterface
-     */
-    private function getDriver()
-    {
-        return $this->driver;
-    }
-
-//    /**
-//     * @param string $path
-//     *
-//     * @return bool
-//     */
-//    private function validatePath($path)
-//    {
-//        // TODO. Not yet work
-//        return true;
-//    }
-
-    /**
-     * Try to understand what 1 of the 3 known protocol we shall use
-     *
-     * @param  string $protocol
-     *         String value of protocol type
-     *
-     * @return bool
-     *         Return true if all ok
-     * @throws ProtocolValidateStreamException
-     *         Throw exception if protocol undefined
-     */
-    private function validateProtocol($protocol)
-    {
-        if ($protocol == self::PROTOCOL_TCP) {
-            return true;
-        } elseif ($protocol == self::PROTOCOL_UDP) {
-            return true;
-        } elseif ($protocol == self::PROTOCOL_UNIX) {
-            return true;
-        } else {
-            throw new ProtocolValidateStreamException(
-                sprintf("Protocol '%s' unidentified", $protocol)
-            );
-        }
-
-    }
-
-    /**
      * @param bool $blocking
      *
-     * @throws Exceptions\StreamException
+     * @throws Exception\StreamException
      */
     private function setBlocking($blocking)
     {
@@ -518,5 +359,21 @@ class Stream
     private function getReceiveMethod()
     {
         return $this->method;
+    }
+
+    /**
+     * @return Connection
+     */
+    private function getConnection()
+    {
+        return $this->connection;
+    }
+
+    /**
+     * @return DataHandler
+     */
+    private function getDataHandler()
+    {
+        return $this->dataHandler;
     }
 }

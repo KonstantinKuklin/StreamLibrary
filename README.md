@@ -39,9 +39,9 @@ $stream = new \Stream\Stream($path, $protocol, $port, $driver);
 
 **path** - Path to file on system or ip address in network or hostname which we will work
 
-**protocol** - String value of protocol type, can be Stream::PROTOCOL_TCP,Stream::PROTOCOL_UDP,Stream::PROTOCOL_UNIX
+**protocol** - String value of protocol type, can be Connection::PROTOCOL_TCP, Connection::PROTOCOL_UDP, Connection::PROTOCOL_UNIX
 
-**port** - Integer value of port to connect. Not needs if protocol Stream::PROTOCOL_UNIX. Default value = 0.
+**port** - Integer value of port to connect. Not needs if protocol Connection::PROTOCOL_UNIX. Default value = 0.
 
 **driver** - Object implements StreamDriverInterface. If your connection need to change transfer data you need to describe it logic with this object. Default value is null(mean data haven't been changed)
 
@@ -64,4 +64,4 @@ $stream = new \Stream\Stream($path, $protocol, $port, $driver);
 $stream->sendContents($contents);
 ```
 
-**contents** - can contain any data
+**contents** - can contain any string data

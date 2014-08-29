@@ -1,6 +1,6 @@
 <?php
 
-namespace Stream\Exceptions;
+namespace Stream\Exception;
 
 /**
  * @author KonstantinKuklin <konstantin.kuklin@gmail.com>

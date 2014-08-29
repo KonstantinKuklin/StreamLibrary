@@ -2,6 +2,7 @@
 
 namespace Stream\Tests;
 
+use Stream\Connection;
 use Stream\Stream;
 use Exception;
 
@@ -18,7 +19,7 @@ class ConstructorTest extends \PHPUnit_Framework_TestCase
         $noDriver = null;
         $this->checkAssertionToConstructor(
             'Not fail with missed protocol',
-            'Stream\Exceptions\ProtocolValidateStreamException',
+            'Stream\Exception\ProtocolValidateStreamException',
             $validPath,
             $missedProtocol,
             $validPort,
@@ -31,12 +32,12 @@ class ConstructorTest extends \PHPUnit_Framework_TestCase
     public function testZeroPortTcpProtocol()
     {
         $validPath = 'path';
-        $validProtocol = Stream::PROTOCOL_TCP;
+        $validProtocol = Connection::PROTOCOL_TCP;
         $zeroPort = 0;
         $noDriver = null;
         $this->checkAssertionToConstructor(
             'Not fail with zero port',
-            'Stream\Exceptions\PortValidateStreamException',
+            'Stream\Exception\PortValidateStreamException',
             $validPath,
             $validProtocol,
             $zeroPort,

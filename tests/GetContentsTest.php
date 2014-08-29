@@ -5,10 +5,10 @@
 
 namespace Stream\Tests;
 
-
+use Stream\Connection;
 use Stream\ReceiveMethod\StreamGetContentsMethod;
 use Stream\Stream;
-use Stream\Exceptions\NotStringStreamException;
+use Stream\Exception\NotStringStreamException;
 use Stream\StreamDriverInterface;
 
 class TestDriver implements StreamDriverInterface
@@ -41,7 +41,7 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
 
     public function testSendContentsWithOutDriverException()
     {
-        $stream = new Stream('google.ru', Stream::PROTOCOL_TCP, 80);
+        $stream = new Stream('google.ru', Connection::PROTOCOL_TCP, 80);
 
         try {
             $stream->sendContents((array)$this->query);
@@ -54,7 +54,7 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
 
     public function testSendContentsWithDriver()
     {
-        $stream = new Stream('google.ru', Stream::PROTOCOL_TCP, 80, new TestDriver());
+        $stream = new Stream('google.ru', Connection::PROTOCOL_TCP, 80, new TestDriver());
 
         try {
             $stream->sendContents((array)$this->query);
@@ -67,7 +67,7 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
 
     public function testGetContentsWork()
     {
-        $stream = new Stream('google.ru', Stream::PROTOCOL_TCP, 80);
+        $stream = new Stream('google.ru', Connection::PROTOCOL_TCP, 80);
 
         $stream->sendContents($this->query);
         $stream->setReadTimeOut(2);
