@@ -313,6 +313,14 @@ class Stream
     }
 
     /**
+     * @return Connection
+     */
+    public function getConnection()
+    {
+        return $this->connection;
+    }
+    
+    /**
      * Get the resource link or null if we don't have active stream
      *
      * @return null|resource
@@ -359,14 +367,6 @@ class Stream
     private function getReceiveMethod()
     {
         return $this->method;
-    }
-
-    /**
-     * @return Connection
-     */
-    private function getConnection()
-    {
-        return $this->connection;
     }
 
     /**
