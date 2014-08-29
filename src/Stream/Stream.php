@@ -78,20 +78,22 @@ class Stream
      */
     public function open()
     {
-        $stream = @stream_socket_client($this->getUrlConnection(), $errorNumber, $errorMessage);
-        if (!$stream) {
-            throw new ConnectionStreamException(
-                sprintf(
-                    "Can't open '%s'. Error number: '%d', error message: '%s'",
-                    $this->getUrlConnection(),
-                    $errorNumber,
-                    $errorMessage
-                )
+        if (!$this->isOpened()) {
+            $stream = @stream_socket_client($this->getUrlConnection(), $errorNumber, $errorMessage);
+            if (!$stream) {
+                throw new ConnectionStreamException(
+                    sprintf(
+                        "Can't open '%s'. Error number: '%d', error message: '%s'",
+                        $this->getUrlConnection(),
+                        $errorNumber,
+                        $errorMessage
+                    )
 
-            );
+                );
+            }
+
+            $this->stream = $stream;
         }
-
-        $this->stream = $stream;
 
         return true;
     }
@@ -227,6 +229,27 @@ class Stream
     }
 
     /**
+     * @throws ReceiveMethodStreamException
+     */
+    private function checkReceiveMethod()
+    {
+        if ($this->getReceiveMethod() === null) {
+            throw new ReceiveMethodStreamException(
+                'ReceiveMethod was not set. Use $stream->setReceiveMethod to fix it.'
+            );
+        }
+    }
+
+    private function prepareReceiveData($data)
+    {
+        if ($this->hasDriver()) {
+            return $this->getDriver()->prepareReceiveData($data);
+        }
+
+        return $data;
+    }
+
+    /**
      * @throws Exceptions\ConnectionStreamException
      * @throws Exceptions\ReadStreamException
      * @throws Exceptions\ReceiveMethodStreamException
@@ -235,31 +258,16 @@ class Stream
      */
     public function getContents()
     {
-        if ($this->getReceiveMethod() === null) {
-            throw new ReceiveMethodStreamException(
-                'ReceiveMethod was not set. Use $stream->setReceiveMethod to fix it.'
-            );
-        }
+        $this->checkReceiveMethod();
+        $this->open();
 
-        if (!$this->isOpened()) {
-            $this->open();
-        }
-
-        if(!is_resource($this->getStream())){
-            throw new ConnectionStreamException("Stream is not a valid resource.");
-        }
-
-        $receiveMessage = $this->getReceiveMethod()->readStream($this->getStream());
+        $receiveMessage = $this->getReceiveMethod()->readStream($this->getExistedStream());
 
         if (!$receiveMessage) {
             throw new ReadStreamException("Nothing was readed from stream.");
         }
 
-        if ($this->hasDriver()) {
-            return $this->getDriver()->prepareReceiveData($receiveMessage);
-        }
-
-        return $receiveMessage;
+        return $this->prepareReceiveData($receiveMessage);
     }
 
     /**
@@ -289,25 +297,10 @@ class Stream
      */
     public function sendContents($contents)
     {
-        if (!$this->isOpened()) {
-            $this->open();
-        }
+        $this->open();
+        $contents = $this->prepareSendData($contents);
 
-        if ($this->hasDriver()) {
-            $contents = $this->getDriver()->prepareSendData($contents);
-        }
-
-        if (!is_string($contents)) {
-            throw new NotStringStreamException(
-                sprintf("Can't sent not a string data.Data sent: %s", print_r($contents, true))
-            );
-        }
-
-        if(!is_resource($this->getStream())){
-            throw new ConnectionStreamException("Stream is not a valid resource.");
-        }
-
-        $bytesSent = stream_socket_sendto($this->getStream(), $contents);
+        $bytesSent = stream_socket_sendto($this->getExistedStream(), $contents);
         if (!$bytesSent) {
             throw new StreamException(
                 sprintf("Can't sent contents to '%s'", $this->getUrlConnection())
@@ -315,6 +308,25 @@ class Stream
         }
 
         return $bytesSent;
+    }
+
+    /**
+     * @param mixed $data
+     *
+     * @throws NotStringStreamException
+     * @return string
+     */
+    private function prepareSendData($data)
+    {
+        if ($this->hasDriver()) {
+            $data = $this->getDriver()->prepareSendData($data);
+        }
+
+        if(!is_string($data)) {
+            throw new NotStringStreamException("After prepareSendData data must be string.");
+        }
+
+        return $data;
     }
 
     /**
@@ -404,6 +416,19 @@ class Stream
     private function getStream()
     {
         return $this->stream;
+    }
+
+    /**
+     * @return resource
+     * @throws StreamException
+     */
+    private function getExistedStream()
+    {
+        if ($this->stream !== null) {
+            return $this->stream;
+        }
+
+        throw new StreamException("Stream is null");
     }
 
     /**
