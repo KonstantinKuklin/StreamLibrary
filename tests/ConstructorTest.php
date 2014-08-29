@@ -63,7 +63,6 @@ class ConstructorTest extends \PHPUnit_Framework_TestCase
             switch ($realExceptionClass) {
                 case $expectedExceptionClass:
                     return true;
-                    break;
             }
         }
 
