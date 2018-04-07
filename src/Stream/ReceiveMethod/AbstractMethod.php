@@ -6,7 +6,7 @@
 namespace Stream\ReceiveMethod;
 
 use Respect\Validation\Validator as v;
-use Stream\Exceptions\StreamException;
+use Stream\Exception\StreamException;
 
 abstract class AbstractMethod implements MethodInterface
 {
@@ -17,11 +17,11 @@ abstract class AbstractMethod implements MethodInterface
      * @param bool     $inclusive
      *
      * @return bool
-     * @throws \Stream\Exceptions\StreamException
+     * @throws \Stream\Exception\StreamException
      */
     protected function validateInt($value, $min = null, $max = null, $inclusive = false)
     {
-        if (!v::int()->between($min, $max, $inclusive)->validate($value)) {
+        if (!v::intVal()->between($min, $max, $inclusive)->validate($value)) {
             throw new StreamException(
                 sprintf(
                     "The value must be Int with min value:'%s', max value:'%s'.(Inclusive:'%s'). But got %s with value %s.",
