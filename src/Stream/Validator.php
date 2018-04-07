@@ -46,9 +46,9 @@ class Validator
      */
     public static function validatePort($port)
     {
-        if (!v::int()->between(0, 65635)->validate($port)) {
+        if (!v::intVal()->between(1, 65635)->validate($port)) {
             throw new PortValidateStreamException(
-                sprintf("Port '%s' is not a integer number or not inside the range: 0-65535", $port)
+                sprintf("Port '%s' is not a integer number or not inside the range: 1-65535", $port)
             );
         }
     }
@@ -72,7 +72,7 @@ class Validator
      */
     public static function validateSeconds($seconds)
     {
-        if (!v::int()->min(0, true)->validate($seconds)) {
+        if (!v::intVal()->min(0, true)->validate($seconds)) {
             throw new StreamException(
                 sprintf("Seconds must be int >= 0, got %s with value %s.", gettype($seconds), $seconds)
             );
@@ -86,7 +86,7 @@ class Validator
      */
     public static function validateMicroSeconds($microSeconds)
     {
-        if ($microSeconds !== 0 && !v::int()->min(0, true)->validate($microSeconds)) {
+        if ($microSeconds !== 0 && !v::intVal()->min(0, true)->validate($microSeconds)) {
             throw new StreamException(
                 sprintf("Micro seconds must be int >= 0, got %s with value %s.", gettype($microSeconds), $microSeconds)
             );

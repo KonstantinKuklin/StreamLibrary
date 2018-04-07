@@ -84,6 +84,6 @@ class GetContentsTest extends \PHPUnit_Framework_TestCase
             $this->fail("Got wrong response.");
         }
 
-        $this->assertEquals("HTTP/1.0 302 Found", trim($contents[0]), "Contents was got incorrect.");
+        $this->assertEquals("HTTP/1.0 404 Not Found", trim($contents[0]), "Contents was got incorrect.");
     }
 }
